@@ -1,0 +1,35 @@
+{
+  "name": "kdd-codex",
+  "version": "1.0.0+codex.20260921005515",
+  "description": "A deterministic KDD workflow skill for planning, implementation, and verification.",
+  "author": {
+    "name": "Mauricio Perera",
+    "url": "https://github.com/MauricioPerera/KDD"
+  },
+  "skills": "./skills/",
+  "homepage": "https://mauricioperera.github.io/KDD/",
+  "repository": "https://github.com/MauricioPerera/KDD",
+  "license": "MIT",
+  "interface": {
+    "displayName": "KDD for Codex",
+    "shortDescription": "Plan, build, and verify work with deterministic KDD contracts.",
+    "longDescription": "Guides developers through Knowledge-Driven Development with scoped contracts, deterministic validation, and evidence-led completion. This version is skill-only and does not send data or connect to external services.",
+    "developerName": "Mauricio Perera",
+    "category": "Productivity",
+    "capabilities": [
+      "Interactive"
+    ],
+    "websiteURL": "https://mauricioperera.github.io/KDD/",
+    "privacyPolicyURL": "https://github.com/MauricioPerera/KDD/blob/main/plugins/kdd-codex/PRIVACY.md",
+    "termsOfServiceURL": "https://github.com/MauricioPerera/KDD/blob/main/plugins/kdd-codex/TERMS.md",
+    "brandColor": "#B58D3F",
+    "composerIcon": "./assets/kdd-logo.svg",
+    "logo": "./assets/kdd-logo.svg",
+    "logoDark": "./assets/kdd-logo.svg",
+    "defaultPrompt": [
+      "Prepare this task using KDD contracts and verification.",
+      "Create a KDD contract and a frozen regression test for this change.",
+      "Audit this implementation against its KDD evidence."
+    ]
+  }
+}

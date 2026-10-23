@@ -1,0 +1,122 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import type { BlindSecretMeta } from './types.ts';
+import { readVersion, writeVersion } from './persistence.ts';
+
+export class BlindVault {
+  private filePath: string;
+  private version: string | null = null;
+  private secrets: Map<string, { value: string; updatedAt: string }> = new Map();
+
+  constructor(filePath: string) {
+    this.filePath = filePath;
+    this.load();
+  }
+
+  private load(): void {
+    this.secrets.clear();
+    this.version = readVersion(this.filePath);
+    if (this.version === null) {
+      return;
+    }
+    const content = this.version;
+    const lines = content.split('\n');
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith('#')) continue;
+      const eqIdx = trimmed.indexOf('=');
+      if (eqIdx === -1) continue;
+      const key = trimmed.substring(0, eqIdx).trim();
+      let val = trimmed.substring(eqIdx + 1).trim();
+      if (
+        (val.startsWith('"') && val.endsWith('"')) ||
+        (val.startsWith("'") && val.endsWith("'"))
+      ) {
+        if (val.startsWith('"')) {
+          try { val = JSON.parse(val); } catch { val = val.substring(1, val.length - 1); }
+        } else val = val.substring(1, val.length - 1);
+      }
+      this.secrets.set(key, { value: val, updatedAt: new Date().toISOString() });
+    }
+  }
+
+  private save(): void {
+    const dir = path.dirname(this.filePath);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+    const lines: string[] = ['# Blind Vault managed credentials (KDD-Board)'];
+    for (const [key, item] of this.secrets.entries()) {
+      lines.push(`${key}=${JSON.stringify(item.value)}`);
+    }
+    const content = lines.join('\n') + '\n';
+    writeVersion(this.filePath, this.version, content);
+    this.version = content;
+    if (process.platform !== 'win32') {
+      fs.chmodSync(this.filePath, 0o600);
+    }
+  }
+
+  public setSecret(key: string, secretValue: string): void {
+    const sanitizedKey = key.trim().toUpperCase().replace(/[^A-Z0-9_]/g, '_');
+    if (!sanitizedKey) {
+      throw new Error('BlindVault: key must be a non-empty string');
+    }
+    this.secrets.set(sanitizedKey, {
+      value: secretValue,
+      updatedAt: new Date().toISOString(),
+    });
+    this.save();
+  }
+
+  public hasSecret(key: string): boolean {
+    this.load();
+    const sanitizedKey = key.trim().toUpperCase().replace(/[^A-Z0-9_]/g, '_');
+    return this.secrets.has(sanitizedKey);
+  }
+
+  public maskSecret(_value: string): string {
+    return '***';
+  }
+
+  public listSecrets(): BlindSecretMeta[] {
+    this.load();
+    const list: BlindSecretMeta[] = [];
+    for (const [key, item] of this.secrets.entries()) {
+      list.push({
+        key,
+        isSet: true,
+        maskedValue: this.maskSecret(item.value),
+        updatedAt: item.updatedAt,
+      });
+    }
+    return list;
+  }
+
+  public getSecretValue(key: string): string | undefined {
+    this.load();
+    const sanitizedKey = key.trim().toUpperCase().replace(/[^A-Z0-9_]/g, '_');
+    return this.secrets.get(sanitizedKey)?.value;
+  }
+
+  public deleteSecret(key: string): boolean {
+    this.load();
+    const sanitizedKey = key.trim().toUpperCase().replace(/[^A-Z0-9_]/g, '_');
+    const existed = this.secrets.delete(sanitizedKey);
+    if (existed) {
+      this.save();
+    }
+    return existed;
+  }
+
+  public environment(): Record<string, string> {
+    this.load();
+    return Object.fromEntries([...this.secrets].map(([key, item]) => [key, item.value]));
+  }
+
+  public exportToProcessEnv(): void {
+    for (const [key, item] of this.secrets.entries()) {
+      process.env[key] = item.value;
+    }
+  }
+}

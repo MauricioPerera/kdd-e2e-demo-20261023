@@ -1,0 +1,347 @@
+"""Tests del inicializador de plantilla KDD (Contrato 06 / I-INIT).
+
+Cubren lo que lista la seccion Tests del task contract
+``knowledge/contracts/init-project.md``: dry-run inocuo, apply exacto al
+manifiesto, los 3 gates verdes post-apply en la copia, intocables presentes,
+``--name`` solo el titulo, manifiesto incompleto aborta, exit codes del CLI.
+
+Corren sobre una **copia temporal** del repo (sin ``.git``): el target
+``scripts/init_project.py`` NO toca el repo real. Los tests PUEDEN usar
+subprocess (patron estandar); el target es stdlib puro y sin subprocess.
+"""
+
+import importlib.util
+import json
+import os
+import shutil
+import subprocess
+import sys
+import tempfile
+import unittest
+from pathlib import Path
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+ROOT = os.path.dirname(HERE)
+SCRIPT = os.path.join(ROOT, "scripts", "init_project.py")
+
+# Manifiesto importado del propio scripts/init_project.py (no se duplica la
+# lista): si el repo real YA fue inicializado (--apply corrido sobre el arbol
+# real), los artefactos de ejemplo del manifiesto desaparecen y estos tests esperan la
+# plantilla integra -> fallarian. El guard de clase skipUnless abajo saltea
+# toda la suite en ese caso; en la plantilla integra (8 presentes) corre.
+_spec_init = importlib.util.spec_from_file_location("init_project", SCRIPT)
+_init_mod = importlib.util.module_from_spec(_spec_init)
+_spec_init.loader.exec_module(_init_mod)
+MANIFEST = _init_mod.MANIFEST
+HISTORICAL_ARTIFACTS = tuple(sorted(
+    path.relative_to(ROOT).as_posix()
+    for pattern in ("specs/CONTRACT-[0-9]*.md", "docs/reports/CONTRACT-[0-9]*-REPORT.md")
+    for path in Path(ROOT).glob(pattern)
+))
+KDD_ONLY_REPORTS = (
+    "docs/reports/AUDIT-HARDENING-REPORT.md",
+    "docs/reports/LEGACY-COMPLETION-AUDIT.md",
+    "docs/reports/PROFILE-PILOT-REPORT.md",
+    "docs/reports/QUALITY-APPROVAL-REPORT.md",
+    "docs/reports/VERIFICATION-BROWSER-REPORT.md",
+)
+
+# Intocables que deben seguir presentes post-apply (subset representative
+# del listado del task contract).
+INTACTABLES = (
+    "scripts/validate_contracts.py",
+    "scripts/validate_okf.py",
+    "scripts/assemble_context.py",
+    "scripts/export_gate_contract.py",
+    "ccdd/context.json",
+    ".agents/AGENTS.md",
+    ".agents/skills/kdd-okf-ccdd-hybrid/SKILL.md",
+    "specs/TEMPLATE-CONTRACT.md",
+    "docs/reports/TEMPLATE-REPORT.md",
+    "knowledge/OKF-SPEC.md",
+    "knowledge/metodologia-ejecucion.md",
+    "knowledge/contracts/assemble-context.md",
+    "knowledge/contracts/agents-context-rule.md",
+    "knowledge/contracts/validate-okf.md",
+    "knowledge/contracts/export-gate-contract.md",
+    "knowledge/contracts/init-project.md",
+    ".github/workflows/validate.yml",
+    "tests/test_agents_rules.py",
+    "tests/test_assemble_context.py",
+    "tests/test_export_gate_contract.py",
+    "tests/test_validate_contracts.py",
+    "tests/test_validate_okf.py",
+)
+
+
+def _ignore(src, names):
+    # Replica de clon: ademas de .git/__pycache__/*.gate.md, .agents/logs/
+    # esta gitignorado -> no existe en un clon fresco. Excluirlo hace la
+    # copia fiel al clon (sin logs heredados) y ejercita el mkdir del helper
+    # _tmpdir() del export gate test durante el discover de la copia.
+    ignored = [n for n in names
+               if n in (".git", "__pycache__") or n.endswith(".gate.md")]
+    if os.path.basename(src) == ".agents":
+        ignored.append("logs")
+    # Dependencias locales regenerables: no forman parte del clon del board.
+    if Path(src).resolve() == (Path(ROOT) / "tools" / "kdd-board").resolve():
+        if "node_modules" in names:
+            ignored.append("node_modules")
+    return ignored
+
+
+def _copy_repo(dst, full=False):
+    if full:
+        shutil.copytree(ROOT, dst, ignore=_ignore, dirs_exist_ok=True)
+        return
+    # Unit cases need only the manifest, init inputs and representative
+    # infrastructure. The post-apply integration case still copies everything.
+    fixture_files = (set(MANIFEST) | set(HISTORICAL_ARTIFACTS)
+                     | set(KDD_ONLY_REPORTS) | set(INTACTABLES)
+                     | set(_init_mod.REQUIRED_AFTER_DELETE)
+                     | {"completion-legacy.json", "CHANGELOG.md"})
+    for rel in fixture_files:
+        source = Path(ROOT, rel)
+        target = Path(dst, rel)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source, target)
+
+
+def _files(root):
+    """Conjunto de rutas relativas posix de archivos bajo root."""
+    out = set()
+    for dirpath, _dirs, files in os.walk(root):
+        for name in files:
+            rel = os.path.relpath(os.path.join(dirpath, name), root)
+            out.add(rel.replace(os.sep, "/"))
+    return out
+
+
+def _run_cli(repo_dir, *args):
+    if "--apply" in args and "--repository" not in args:
+        args += ("--repository", "ExampleCo/Shop")
+    return subprocess.run(
+        [sys.executable, SCRIPT, "--repo-dir", repo_dir, *args],
+        capture_output=True, text=True, encoding="utf-8")
+
+
+def _run(args, cwd):
+    return subprocess.run([sys.executable, *args], cwd=cwd,
+                          capture_output=True, text=True, encoding="utf-8")
+
+
+class TestCopyFilter(unittest.TestCase):
+    def test_excludes_only_board_dependencies(self):
+        names = ["node_modules", "src", "package.json", "package-lock.json"]
+        board = Path(ROOT) / "tools" / "kdd-board"
+        self.assertEqual(_ignore(str(board), names), ["node_modules"])
+        for parent in (Path(ROOT), Path(ROOT) / "other" / "kdd-board",
+                       board / "src"):
+            with self.subTest(parent=str(parent)):
+                self.assertEqual(_ignore(str(parent), names), [])
+
+    def test_copy_preserves_board_sources_and_lockfile(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            from unittest.mock import patch
+            root = Path(tmp) / "source"
+            board = root / "tools" / "kdd-board"
+            (board / "node_modules").mkdir(parents=True)
+            (board / "src").mkdir()
+            files = {"src/index.ts": "source", "package.json": "{}",
+                     "package-lock.json": "{}", "node_modules/local": "dependency"}
+            for rel, content in files.items():
+                (board / rel).write_text(content, encoding="utf-8")
+            other = root / "other" / "node_modules"
+            other.mkdir(parents=True)
+            (other / "keep").write_text("keep", encoding="utf-8")
+            dst = Path(tmp) / "copy"
+            with patch.dict(globals(), ROOT=str(root)):
+                _copy_repo(str(dst), full=True)
+            copied = dst / "tools" / "kdd-board"
+            self.assertFalse((copied / "node_modules").exists())
+            for rel in ("src/index.ts", "package.json", "package-lock.json"):
+                self.assertEqual((copied / rel).read_text(encoding="utf-8"), files[rel])
+            self.assertEqual((dst / "other/node_modules/keep").read_text(encoding="utf-8"), "keep")
+
+
+@unittest.skipUnless(
+    all(os.path.isfile(os.path.join(ROOT, rel)) for rel in MANIFEST),
+    "plantilla ya inicializada: faltan artefactos del manifiesto de ejemplo")
+class TestInitProject(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.repo = self.tmp.name
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def test_dry_run_no_modifica_nada(self):
+        _copy_repo(self.repo)
+        sentinel = Path(self.repo) / "tools/kdd-board/node_modules/preserve.txt"
+        sentinel.parent.mkdir(parents=True, exist_ok=True)
+        sentinel.write_bytes(b"preserve dependency content\n")
+        before = _files(self.repo)
+        r = _run_cli(self.repo)  # sin --apply
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn("dry-run", r.stdout.lower())
+        after = _files(self.repo)
+        self.assertEqual(before, after, "dry-run modifico el arbol")
+        self.assertEqual(sentinel.read_bytes(), b"preserve dependency content\n")
+        # el index tampoco se reescribio
+        idx = Path(self.repo, "knowledge", "index.md")
+        self.assertIn("data_models/users_table.md", idx.read_text(encoding="utf-8"))
+
+    def test_apply_elimina_exactamente_el_manifiesto(self):
+        _copy_repo(self.repo)
+        sentinel = Path(self.repo) / "tools/kdd-board/node_modules/preserve.txt"
+        sentinel.parent.mkdir(parents=True, exist_ok=True)
+        sentinel.write_bytes(b"preserve dependency content\n")
+        before = _files(self.repo)
+        r = _run_cli(self.repo, "--apply")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        after = _files(self.repo)
+        self.assertEqual(sentinel.read_bytes(), b"preserve dependency content\n")
+        self.assertEqual(before - after, set(MANIFEST),
+                         "se elimino algo distinto al manifiesto: {}".format(
+                             before - after))
+        self.assertEqual(after - before, set(),
+                         "apply creo archivos: {}".format(after - before))
+        self.assertEqual(len([p for p in HISTORICAL_ARTIFACTS
+                              if p.startswith("specs/")]), 33)
+        self.assertEqual(len([p for p in HISTORICAL_ARTIFACTS
+                              if p.startswith("docs/reports/")]), 33)
+        self.assertTrue(set(HISTORICAL_ARTIFACTS).issubset(MANIFEST))
+        self.assertTrue(set(KDD_ONLY_REPORTS).issubset(MANIFEST))
+        for rel in MANIFEST:
+            self.assertFalse(os.path.isfile(os.path.join(self.repo, rel)),
+                             "no se elimino: {}".format(rel))
+        policy = json.loads(Path(self.repo, "completion-legacy.json").read_text(encoding="utf-8"))
+        self.assertEqual(policy, {"schema_version": 1, "repository": "ExampleCo/Shop",
+                                  "legacy_pairs": {}})
+        changelog = Path(self.repo, "CHANGELOG.md").read_text(encoding="utf-8")
+        self.assertIn("## v0.1.0", changelog)
+        self.assertNotIn("**Contract 01", changelog)
+
+    @unittest.skipIf(os.environ.get("KDD_SKIP_INIT_POST_APPLY_SUITE") == "1",
+                     "already covered by the init-project contract test_command")
+    def test_gates_verdes_post_apply_en_copia(self):
+        # Criterio estrella: sin historia ajena y gates del nuevo repo verdes.
+        _copy_repo(self.repo, full=True)
+        self.assertEqual(_run_cli(self.repo, "--apply").returncode, 0)
+        vc = _run(["scripts/validate_contracts.py", "knowledge/contracts"], self.repo)
+        self.assertEqual(vc.returncode, 0, "validate_contracts:\n" + vc.stdout + vc.stderr)
+        vo = _run(["scripts/validate_okf.py", "knowledge"], self.repo)
+        self.assertEqual(vo.returncode, 0, "validate_okf:\n" + vo.stdout + vo.stderr)
+        for argv in (
+            ["scripts/validate_specs.py", "specs"],
+            ["scripts/validate_changelog.py"],
+            ["scripts/validate_completion.py", "--specs-dir", "specs", "--policy",
+             "completion-legacy.json", "--repository", "ExampleCo/Shop"],
+        ):
+            result = _run(argv, self.repo)
+            self.assertEqual(result.returncode, 0,
+                             "{}:\n{}{}".format(argv[0], result.stdout, result.stderr))
+        completion = _run(["scripts/validate_completion.py", "--repository",
+                           "ExampleCo/Shop"], self.repo)
+        self.assertIn("Summary: PASS=0 FAIL=0 SKIP=0", completion.stdout)
+        # Evitar recursion: este mismo test no debe correrse dentro del
+        # discover de la copia (no es "infra restante", es el test del tool).
+        os.unlink(os.path.join(self.repo, "tests", "test_init_project.py"))
+        disc = _run(["-m", "unittest", "discover", "-s", "tests",
+                     "-p", "test_*.py"], self.repo)
+        self.assertEqual(disc.returncode, 0,
+                         "unittest discover:\n" + disc.stdout + disc.stderr)
+
+    def test_intocables_presentes_post_apply(self):
+        _copy_repo(self.repo)
+        self.assertEqual(_run_cli(self.repo, "--apply").returncode, 0)
+        for rel in INTACTABLES:
+            self.assertTrue(os.path.exists(os.path.join(self.repo, rel)),
+                            "intocable faltante post-apply: {}".format(rel))
+
+    def test_name_reemplaza_solo_el_titulo_h1(self):
+        _copy_repo(self.repo)
+        before = Path(self.repo, "README.md").read_text(encoding="utf-8").split("\n")
+        self.assertEqual(_run_cli(self.repo, "--apply", "--name",
+                                  "Mi Proyecto").returncode, 0)
+        after = Path(self.repo, "README.md").read_text(encoding="utf-8").split("\n")
+        self.assertEqual(after[0], "# Mi Proyecto")
+        self.assertIn("CHANGELOG.md", "\n".join(after))
+        self.assertNotEqual(after[0], before[0])
+
+    def test_repository_required_for_apply_without_side_effects(self):
+        _copy_repo(self.repo)
+        before = _files(self.repo)
+        result = subprocess.run([sys.executable, SCRIPT, "--repo-dir", self.repo,
+                                 "--apply"], capture_output=True, text=True)
+        self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+        self.assertEqual(_files(self.repo), before)
+
+    def test_invalid_repository_rejected_without_side_effects(self):
+        _copy_repo(self.repo)
+        before = _files(self.repo)
+        result = _run_cli(self.repo, "--apply", "--repository", "wrong-name")
+        self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+        self.assertEqual(_files(self.repo), before)
+
+    def test_historical_report_missing_aborts_without_deletion(self):
+        _copy_repo(self.repo)
+        missing = Path(self.repo, "docs/reports/CONTRACT-01-REPORT.md")
+        missing.unlink()
+        before = _files(self.repo)
+        result = _run_cli(self.repo, "--apply")
+        self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+        self.assertEqual(_files(self.repo), before)
+
+    def test_manifiesto_incompleto_aborta_sin_tocar_nada(self):
+        _copy_repo(self.repo)
+        before = _files(self.repo)
+        os.unlink(os.path.join(self.repo, "src", "users.py"))
+        r = _run_cli(self.repo, "--apply")
+        self.assertEqual(r.returncode, 2, r.stdout + r.stderr)
+        self.assertEqual(_files(self.repo), before - {"src/users.py"},
+                         "aborto pero toco archivos")
+
+    def test_exit_code_0_dry_run(self):
+        _copy_repo(self.repo)
+        self.assertEqual(_run_cli(self.repo).returncode, 0)
+
+    def test_exit_code_0_apply(self):
+        _copy_repo(self.repo)
+        self.assertEqual(_run_cli(self.repo, "--apply").returncode, 0)
+
+    def test_exit_code_2_manifiesto_incompleto(self):
+        _copy_repo(self.repo)
+        os.unlink(os.path.join(self.repo, "knowledge", "contracts",
+                               "validate-user-record.md"))
+        self.assertEqual(_run_cli(self.repo, "--apply").returncode, 2)
+
+    def test_index_md_faltante_aborta_sin_borrar(self):
+        # H-1: manifiesto completo pero knowledge/index.md ausente. Antes del
+        # fix el bucle de borrado vaciaba los 50 artefactos y _rewrite_index
+        # crasheaba con FileNotFoundError -> exit 1, repo vacio. Ahora el
+        # pre-check de atomicidad cubre index.md -> ValueError (exit 2) SIN
+        # borrar ni un archivo.
+        _copy_repo(self.repo)
+        before = _files(self.repo)
+        os.unlink(os.path.join(self.repo, "knowledge", "index.md"))
+        r = _run_cli(self.repo, "--apply")
+        self.assertEqual(r.returncode, 2, r.stdout + r.stderr)
+        self.assertEqual(_files(self.repo), before - {"knowledge/index.md"},
+                         "aborto con exit 2 pero igual borro artefactos")
+
+    def test_readme_md_faltante_aborta_sin_borrar(self):
+        # H-1: el pre-check tambien cubre README.md (lo lee _rename_readme
+        # tras el borrado). Manifiesto + index presentes, solo README ausente
+        # -> exit 2 sin borrar nada.
+        _copy_repo(self.repo)
+        before = _files(self.repo)
+        os.unlink(os.path.join(self.repo, "README.md"))
+        r = _run_cli(self.repo, "--apply")
+        self.assertEqual(r.returncode, 2, r.stdout + r.stderr)
+        self.assertEqual(_files(self.repo), before - {"README.md"},
+                         "aborto con exit 2 pero igual borro artefactos")
+
+
+if __name__ == "__main__":
+    unittest.main()

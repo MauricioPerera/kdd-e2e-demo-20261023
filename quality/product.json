@@ -1,0 +1,128 @@
+{
+  "protected": [
+    "tests/test_greeting.py",
+    "tests/__init__.py",
+    "src/__init__.py",
+    "knowledge/contracts/greeting.md",
+    "knowledge/demo-project.md",
+    "requirements-change-audit.txt",
+    "scripts/assemble_context.py",
+    "scripts/audit_forbids.py",
+    "scripts/audit_seals.py",
+    "scripts/behavior_contract.py",
+    "scripts/benchmark_gates.py",
+    "scripts/bootstrap_project.py",
+    "scripts/change_contract_multilang.py",
+    "scripts/export_gate_contract.py",
+    "scripts/guard_pr_baseline.py",
+    "scripts/init_project.py",
+    "scripts/lint_ascii.py",
+    "scripts/mcp_gate_dispatch.py",
+    "scripts/mcp_server.py",
+    "scripts/mutation_audit.py",
+    "scripts/native_level2.py",
+    "scripts/native_level2_worker.py",
+    "scripts/optional_evidence.py",
+    "scripts/preflight.py",
+    "scripts/quality_baseline.py",
+    "scripts/rule_engine.py",
+    "scripts/rule_hints.py",
+    "scripts/run_behavior.py",
+    "scripts/run_profile.py",
+    "scripts/scan_lint_suppressions.py",
+    "scripts/scan_secrets.py",
+    "scripts/setup_native_level2.py",
+    "scripts/task_evidence.py",
+    "scripts/task_git.py",
+    "scripts/task_model.py",
+    "scripts/tasks.py",
+    "scripts/validate_accessibility_findings.py",
+    "scripts/validate_attestation.py",
+    "scripts/validate_baseline.py",
+    "scripts/validate_behavior.py",
+    "scripts/validate_budgets.py",
+    "scripts/validate_change_contract.py",
+    "scripts/validate_changelog.py",
+    "scripts/validate_commit_message.py",
+    "scripts/validate_completion.py",
+    "scripts/validate_compliance_findings.py",
+    "scripts/validate_contracts.py",
+    "scripts/validate_dependency_eol_findings.py",
+    "scripts/validate_diagrams.py",
+    "scripts/validate_observability_findings.py",
+    "scripts/validate_okf.py",
+    "scripts/validate_perimeter.py",
+    "scripts/validate_privacy_findings.py",
+    "scripts/validate_rules.py",
+    "scripts/validate_security_findings.py",
+    "scripts/validate_skills.py",
+    "scripts/validate_specs.py",
+    "scripts/validate_tasks.py",
+    "scripts/validate_test_commands.py",
+    "scripts/validate_test_coverage_findings.py",
+    "scripts/validate_ux_page.py",
+    "scripts/verify_completion_runs.py",
+    "scripts/verify_quality.py",
+    ".github/workflows/deploy-pages.yml",
+    ".github/workflows/trusted-pr-gate.yml",
+    ".github/workflows/validate.yml"
+  ],
+  "implementation": [
+    "src/greeting.py"
+  ],
+  "pm": [
+    "knowledge/tasks/TASK-001.md",
+    "knowledge/index.md",
+    "docs/reports/TASK-001-REPORT.md"
+  ],
+  "required_kinds": [
+    "functional",
+    "adversarial",
+    "ui"
+  ],
+  "checks": [
+    {
+      "name": "contracts",
+      "kind": "structural",
+      "argv": [
+        "python",
+        "scripts/validate_contracts.py",
+        "knowledge/contracts"
+      ],
+      "timeout": 60
+    },
+    {
+      "name": "functional",
+      "kind": "functional",
+      "argv": [
+        "python",
+        "-m",
+        "unittest",
+        "tests.test_greeting.FunctionalGreetingTests"
+      ],
+      "timeout": 60
+    },
+    {
+      "name": "adversarial",
+      "kind": "adversarial",
+      "argv": [
+        "python",
+        "-m",
+        "unittest",
+        "tests.test_greeting.AdversarialGreetingTests"
+      ],
+      "timeout": 60
+    },
+    {
+      "name": "cli",
+      "kind": "ui",
+      "argv": [
+        "python",
+        "-m",
+        "unittest",
+        "tests.test_greeting.GreetingCliTests"
+      ],
+      "timeout": 60
+    }
+  ]
+}

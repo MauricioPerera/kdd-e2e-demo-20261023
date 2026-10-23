@@ -1,0 +1,106 @@
+# Knowledge Bundle (OKF)
+
+Bienvenido a la base de conocimiento del proyecto. El formato de los nodos está especificado en [OKF-SPEC](./OKF-SPEC.md).
+
+## Referencia
+- [Optimizacion de CI](./contracts/ci-execution-deduplication.md) — agrupacion local de comandos identicos, concurrencia de PR y medicion antes/despues.
+- [Tareas con Git](./git-tasks.md) — CLI local, nodos Task y estados registrados por commits en main.
+- [Perfiles de adopción KDD](./adoption-profiles.md) — niveles minimal, standard y strict para incorporar gates progresivamente.
+- [Sprints orientados a resultados](./sprints.md) — protocolo piloto opt-in para seleccionar backlog, admitir tareas y medir consumo por resultado aceptado.
+- [Por que KDD](./por-que-kdd.md) — posicionamiento honesto frente a Spec Kit, BMAD-METHOD y un AGENTS.md solo: que verifica distinto KDD, y en que casos no conviene.
+- [Quickstart](./quickstart.md) — tutorial paso a paso y ejecutable: de clonar la plantilla a tu primer task contract propio en verde.
+- [Glosario](./glosario.md) — indice unico de los ~20 terminos propios de OKF+CCDD, con link al nodo normativo de cada uno.
+- [Guia humana de supervision](./supervision-humana.md) — checklist para quien revisa un PR producido con KDD sin haber leido todo el proceso interno.
+- [MCP server propio](./mcp-server.md) — como instalar y registrar los gates de KDD como tools MCP (opt-in, no Nivel 1).
+- [Especificación OKF](./OKF-SPEC.md) — spec normativa de nodos OKF.
+- [Metodología de ejecución por contratos](./metodologia-ejecucion.md) — proceso operativo de nivel proyecto (specs/, docs/reports/, delegación y verificación).
+- [Validación de contratos](./validacion.md) — nodo canónico: niveles 1 y 2, gate multi-lenguaje, export, precedencia del budget y ciclo de vida.
+- [Casos reales de la metodología](./casos-reales.md) — incidentes verificados que motivaron las reglas; evidencia separada del proceso normativo.
+- [Upgrade de la plantilla](./plantilla-upgrade.md) — qué es infraestructura sobreescribible desde upstream vs. propiedad del proyecto; procedimiento manual de upgrade.
+- [Rule contract](./rule-contract-spec.md) — vertiente que valida reglas de negocio como datos declarativos (no solo código); familias, golden set y frontera dato/lógica.
+- [Behavior contracts v1](./behavior-contract-spec.md) — propiedades ejecutables opcionales, evidencia estructurada y frontera explícita de garantía.
+- [Puente GAME Protocol](./game-data-bridge.md) — receta canónica para poner datos de juego (gameplay as data) bajo contratos KDD: toolchain vendoreado, perfil propio, oráculo sellado con lint/export/no-drift.
+- [Patrón de estructura para paneles admin](./patron-panel-admin.md) — convención de sidebar por entidad, listados sin ID crudo y rutas separadas para auth/recuperación/verificación, contra la tendencia del LLM a apilar todo en una vista. Sin gate propio (no es un dominio de Capa 3): es referencia a aplicar y verificar a mano.
+- [Diagram contract](./diagram-contract-spec.md) — convención para referenciar diagramas Mermaid verificables desde un concept doc OKF; formato del `.diagram-contract.json`; alcance (solo flowchart) y relación con el proyecto hermano `mermaid-gate`.
+- [Mermaid como DSL: tradeoffs](./mermaid-dsl-tradeoffs.md) — por qué Mermaid generado por IA es mal fit como DSL de una plataforma de automatización (sintaxis frágil, sin semántica nativa, sin round-trip), y por qué esas mismas propiedades invertidas son justo las tres que KDD exige a todo artefacto (diffable, escribible por agente sin GUI, verificable por máquina).
+
+## Estructura
+- [Tareas versionadas](./tasks/)
+- [Modelo Task](./data_models/git-task.md)
+- [Modelo de tareas Git](./contracts/task-model.md)
+- [Diario Git de tareas](./contracts/task-journal.md)
+- [Validador de transiciones](./contracts/task-validation.md)
+- [Publicacion del diario mediante merge](./contracts/task-publication.md)
+- [CLI de tareas](./contracts/task-cli.md)
+- [Integracion Git de KDD Board](./board-git.md)
+- [Diario Git del tablero](./contracts/board-git-journal.md)
+- [Interfaz Git del tablero](./contracts/board-git-ui.md)
+- [Contratos de Desarrollo](./contracts/)
+  - [Ejecutor de autoridad local](./contracts/local-authority.md) — permisos aplicados antes del IO.
+  - [Planificador del sprint](./contracts/sprint-planner.md) — relaciones, ciclos, bloqueos y prioridades.
+  - [Admision de tareas al sprint](./contracts/sprint-admission.md) — piloto ejecutable sobre snapshots JSON.
+  - [Motor de reglas declarativo (rule contract)](./contracts/validate-rules.md)
+  - [Gate determinista de rule contracts](./contracts/rules-gate.md)
+  - [Gate de skills de agente](./contracts/skills-gate.md)
+  - [Gate de coherencia CHANGELOG↔reportes](./contracts/changelog-gate.md)
+  - [Gate de perímetro (touch_only como dato)](./contracts/perimeter-gate.md)
+  - [Herramienta de benchmark de gates y suite](./contracts/benchmark-gates.md)
+  - [Gate de UX/accesibilidad de páginas HTML](./contracts/ux-page-gate.md)
+  - [Gate de formato de mensaje de commit](./contracts/commit-message-gate.md)
+  - [Gate de diagramas Mermaid (flowchart, Python puro)](./contracts/diagram-gate.md)
+  - [Gate que ejecuta el test_command de cada contrato (Nivel 1)](./contracts/test-command-gate.md)
+  - [Gate confiable para PR y referencia aprobada](./contracts/trusted-pr-gate.md)
+  - [Enforcement determinista de budgets](./contracts/budget-enforcement.md)
+  - [Auditoria del diff contra contrato aprobado](./contracts/change-contract-audit.md)
+  - [Adaptadores multilenguaje del auditor de cambios](./contracts/change-contract-languages.md)
+  - [Perfiles de validación KDD](./contracts/run-profile.md)
+  - [Manifiesto determinista de baseline de calidad](./contracts/quality-baseline.md)
+  - [Auditor determinista de mutación](./contracts/mutation-audit.md)
+  - [Arranque guiado de un proyecto KDD](./contracts/bootstrap-project.md)
+  - [Integracion real de proyecto nuevo](./contracts/project-initialization.md)
+  - [Gate de secretos filtrados en codigo generado (Nivel 1)](./contracts/secret-scan-gate.md)
+  - [Estados de evidencia opcional en CI](./contracts/optional-evidence.md)
+  - [Remediacion de seguridad y WebMCP del tablero](./contracts/board-security-remediation.md)
+  - [Plugin seguro de Codex para KDD](./contracts/kdd-codex-plugin.md)
+  - [Gate de atestacion de reportes locales](./contracts/attestation-gate.md)
+  - [Capa de despacho del MCP server de gates KDD](./contracts/mcp-gate-dispatch.md)
+  - [Preflight: dry-run local de los 19 gates](./contracts/preflight.md)
+  - [Auditor de seals débiles (advisory, no es un gate)](./contracts/seal-audit.md) — `scripts/audit_seals.py`
+  - [Auditor de `forbids` (advisory, no es un gate)](./contracts/forbids-audit.md) — `scripts/audit_forbids.py`
+- [Recetas de arreglo por rule-id (no es un gate)](./contracts/rule-hints.md) — `scripts/rule_hints.py`
+  - [Validador OKF de la base de conocimiento](./contracts/validate-okf.md)
+  - [Validador de contratos de ejecución (specs)](./contracts/validate-specs.md)
+  - [Coherencia de cierre entre spec, reporte y evidencia](./contracts/completion-evidence.md)
+  - [Verificacion remota del run que respalda un cierre](./contracts/verify-completion-runs.md)
+  - [Lint ASCII de literales en scripts](./contracts/lint-ascii.md)
+  - [Inicializador de proyecto desde la plantilla](./contracts/init-project.md)
+  - [Versionado de la plantilla (coherencia CHANGELOG/README/upgrade)](./contracts/versioning-plantilla.md)
+  - [Ensamblador de contexto CCDD Nivel 2](./contracts/assemble-context.md)
+  - [Exportador de contratos para el gate CCDD Nivel 2](./contracts/export-gate-contract.md)
+  - [Regla de contexto presupuestado en las reglas de agentes](./contracts/agents-context-rule.md)
+- [Modelos de Datos](./data_models/)
+  - [Autoridad local v1](./data_models/local-authority.md) — operaciones soportadas y frontera de confianza.
+  - [Backlog relacionado](./data_models/sprint-backlog.md) — formato y reglas del planificador.
+  - [Hallazgos de seguridad (Capa 3)](./data_models/security_findings.md)
+  - [Hallazgos de compliance/licencias (Capa 3)](./data_models/compliance_findings.md)
+  - [Hallazgos de privacidad/PII (Capa 3)](./data_models/privacy_findings.md)
+  - [Hallazgos de accesibilidad (Capa 3)](./data_models/accessibility_findings.md)
+  - [Hallazgos de vigencia de dependencias / EOL (Capa 3)](./data_models/dependency_eol_findings.md)
+  - [Hallazgos de observabilidad (Capa 3)](./data_models/observability_findings.md)
+  - [Hallazgos de cobertura de tests (Capa 3)](./data_models/test_coverage_findings.md)
+- [Verificacion del tablero](./contracts/board-hardening.md)
+- [Evidencia de seguridad](./contracts/evidence-hardening.md)
+- [Referencia aprobada](./contracts/validate-baseline.md)
+- [Garantias verificables](./verification-guarantees.md)
+
+- [Catalogo al iniciar](./contracts/catalog-startup.md)
+
+- [Aprobacion integrada de calidad](quality-approval.md)
+- [Contrato verify-quality](contracts/verify-quality.md)
+- [Nivel 2 nativo](native-level2.md)
+- [Contrato de integracion nativa](contracts/native-level2.md)
+
+## Proyecto independiente
+
+- [Proyecto de prueba](demo-project.md)
+- [Saludo seguro por CLI](contracts/greeting.md)

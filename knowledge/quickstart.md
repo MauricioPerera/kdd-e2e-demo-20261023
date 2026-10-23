@@ -1,0 +1,251 @@
+---
+type: 'Concept'
+title: 'Quickstart: de clonar la plantilla a tu primer contrato en verde'
+description: 'Tutorial paso a paso, ejecutable, desde clonar KDD hasta tener un task contract propio pasando los gates de Nivel 1. Complementa (no reemplaza) knowledge/validacion.md, que es la referencia normativa.'
+tags: ['ccdd', 'okf', 'onboarding', 'reference']
+---
+
+# Quickstart
+
+Tutorial ejecutable. Cada paso tiene un comando y el resultado esperado.
+Para la referencia normativa completa (niveles de gate, budget, ciclo de
+vida) ver [validacion.md](./validacion.md); esto es el camino corto para
+llegar a tu primer contrato en verde.
+
+## 0. Prerrequisitos
+
+- Python 3.9+ en PATH (`python --version`).
+- Git.
+- Vocabulario minimo (definiciones completas en
+  [OKF-SPEC](./OKF-SPEC.md) y [validacion.md](./validacion.md)):
+  - **Task contract**: un `.md` en `knowledge/contracts/` que define UNA
+    funcion a implementar — intent, firma, tests, restricciones.
+  - **Oraculo congelado**: el archivo de tests de un contrato, escrito
+    ANTES de implementar y sellado por hash (`tests_sha256`) para que no
+    se pueda reescribir para hacer pasar una implementacion incorrecta.
+  - **Gate**: un script determinista (`scripts/validate_*.py`) que
+    verifica una propiedad mecanica (forma del contrato, tests en verde,
+    complejidad bajo presupuesto). Nivel 1 = obligatorio en CI.
+
+## 1. Clonar e instalar
+
+```
+git clone <tu-fork-o-el-template> mi-proyecto
+cd mi-proyecto
+python -m unittest discover -s tests -p "test_*.py"
+```
+
+Esperado: la suite completa termina en `OK` (el template trae ejemplos
+funcionando). Si falla aca, es un problema de entorno (version de Python),
+no de KDD — resolvelo antes de seguir.
+
+## 2. Correr los gates de Nivel 1 tal cual vienen
+
+```
+python scripts/validate_contracts.py knowledge/contracts
+python scripts/validate_test_commands.py knowledge/contracts .
+```
+
+Esperado: ambos en verde (`OK: todos los contratos son validos` /
+`PASS` en cada linea, exit 0). Este es el estado de referencia: la
+plantilla nace verde. La lista completa de gates de Nivel 1 esta en
+[validacion.md](./validacion.md#nivel-1--incluido-y-obligatorio-local--ci).
+
+## 3. Limpiar los ejemplos de la plantilla
+
+```
+python scripts/init_project.py --name "Mi Proyecto" --repository TU_USUARIO/mi-proyecto
+```
+
+(dry-run: solo imprime el plan). Cuando estes conforme:
+
+```
+python scripts/init_project.py --apply --name "Mi Proyecto" --repository TU_USUARIO/mi-proyecto
+```
+
+Esperado: borra los ejemplos y los specs/reportes historicos de KDD listados
+en el `MANIFEST` de `scripts/init_project.py`, reescribe `knowledge/index.md`,
+reinicia `CHANGELOG.md` en v0.1.0 y establece en `completion-legacy.json` el
+repositorio indicado con `legacy_pairs: {}`. Conserva los validadores,
+contratos de infraestructura y templates. `knowledge/contracts/TEMPLATE-task-contract.md`
+es tu punto de partida para el paso siguiente.
+
+El arranque guiado aplica esa misma limpieza a una copia intacta y genera
+ademas `KDD-START-HERE.md` con los pasos del perfil elegido:
+
+```
+python scripts/bootstrap_project.py --apply --name "Mi Proyecto" --repository TU_USUARIO/mi-proyecto --profile standard
+```
+
+Ambas entradas retiran las tareas de demostracion TASK-001 y TASK-002 y sus
+evidencias; las tareas del proyecto nuevo empiezan con su propio historial Git.
+
+Verificar que el repo sigue verde despues de limpiar:
+
+```
+python scripts/validate_contracts.py knowledge/contracts
+python scripts/validate_completion.py --repository TU_USUARIO/mi-proyecto
+python -m unittest discover -s tests -p "test_*.py"
+```
+
+Esperado en completion: `PASS=0 FAIL=0 SKIP=0` antes del primer cierre del
+proyecto. Al crear el repositorio en GitHub, usa exactamente el mismo
+`OWNER/REPO` que declaraste en `--repository`; CI lo compara con
+`github.repository` y rechaza una identidad distinta.
+
+**Antes de publicar `main`**, registra el estado inicializado en un commit y
+obtiene su SHA completo:
+
+```
+git add -A
+git commit -m "chore: initialize project baseline"
+git rev-parse HEAD
+```
+
+Una persona distinta de quien preparo el cambio debe revisar y aprobar ese
+commit como baseline. La inicializacion retira contratos y oraculos de ejemplo,
+por lo que la referencia aprobada para el repositorio plantilla ya no coincide.
+Una vez aprobado el SHA, configura la variable del repositorio de GitHub y
+verifica localmente los contratos y oraculos restantes:
+
+```
+gh variable set KDD_APPROVED_BASELINE_REF --repo TU_USUARIO/mi-proyecto --body SHA_APROBADO
+python scripts/validate_baseline.py --all --approved-ref SHA_APROBADO
+```
+
+El repositorio de GitHub debe existir antes de configurar la variable. CI exige
+esta referencia incluso en el primer push; no toma `HEAD` como aprobacion
+implicita. Si no usas `gh`, configura la misma variable de Actions en GitHub.
+El procedimiento normativo esta en [validacion.md](./validacion.md). La
+inicializacion limpia se verifico en el [PR #110 de KDD](https://github.com/MauricioPerera/KDD/pull/110).
+
+## 4. Tu primer contrato propio
+
+Toma la plantilla que sobrevivio al paso 3:
+
+```
+cp knowledge/contracts/TEMPLATE-task-contract.md knowledge/contracts/saludar.md
+```
+
+Ejemplo concreto — vamos a implementar `def saludar(nombre: str) -> str`
+que devuelve `"Hola, <nombre>!"`.
+
+**4.1 — Escribi el oraculo PRIMERO** (`tests/test_saludar.py`):
+
+```python
+import unittest
+import sys, os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
+from saludar import saludar
+
+class TestSaludar(unittest.TestCase):
+    def test_nombre_simple(self):
+        self.assertEqual(saludar("Ana"), "Hola, Ana!")
+
+    def test_nombre_vacio(self):
+        self.assertEqual(saludar(""), "Hola, !")
+
+if __name__ == '__main__':
+    unittest.main()
+```
+
+**4.2 — Sella el hash del oraculo:**
+
+```
+python scripts/validate_contracts.py --hash tests/test_saludar.py
+```
+
+Esperado: imprime 64 caracteres hex. Copialo.
+
+**4.3 — Crea el stub del target** (`src/saludar.py`):
+
+```python
+def saludar(nombre: str) -> str:
+    raise NotImplementedError
+```
+
+**4.4 — Completa `knowledge/contracts/saludar.md`** reemplazando cada
+placeholder `<...>` (ver el bloque de instrucciones al final del archivo
+copiado). Campos minimos para este ejemplo:
+
+```yaml
+task: saludar
+intent: "Devolver un saludo con el nombre dado."
+target: src/saludar.py
+signature: "def saludar(nombre: str) -> str:"
+test_command: "python -m unittest tests/test_saludar.py"
+budget:
+  cyclomatic_max: 2
+  nesting_max: 1
+tests: "tests/test_saludar.py"
+tests_sha256: "<el hash del paso 4.2>"
+touch_only: ['src/saludar.py']
+deps_allowed: []
+forbids: ['network', 'subprocess', 'llm']
+```
+
+**4.5 — Valida el contrato (antes de implementar nada):**
+
+```
+python scripts/validate_contracts.py knowledge/contracts
+```
+
+Esperado: `OK: todos los contratos son validos`. Si da ERROR, el mensaje
+nombra la seccion o clave faltante — corregi y repeti. Este paso es a
+proposito ANTES de escribir la implementacion real: el contrato tiene que
+estar bien formado antes de delegarlo (a un agente, a otra persona, o a
+vos mismo).
+
+**4.6 — Implementa** `src/saludar.py`:
+
+```python
+def saludar(nombre: str) -> str:
+    return f"Hola, {nombre}!"
+```
+
+**4.7 — Verifica en verde:**
+
+```
+python -m unittest tests/test_saludar.py
+python scripts/validate_test_commands.py knowledge/contracts .
+```
+
+Esperado: ambos exit 0, `saludar.md` aparece como `PASS` en la segunda
+corrida. Ya tenes un contrato completo, verificado de punta a punta.
+
+## 5. Siguiente paso
+
+Antes de delegar trabajo a un agente, corre el preflight y mira que gates
+fallarian sobre el repo actual, en una sola pasada local y sin instalar
+nada (cero dependencias, no es un gate de CI):
+
+```
+python scripts/preflight.py
+```
+
+Esperado: una linea por gate con su estado `PASS`/`FAIL`/`TIMEOUT`/`SKIP` y
+un resumen `N/20`. Si algo falla, arreglalo antes de delegar — no tiene
+sentido mandarle a un agente un repo que ya rompe un gate. Diagnostico
+opt-in, mismo estatus que `benchmark_gates.py` (Nivel 1 tiene 19 gates;
+el preflight suma `validate_attestation`, el local-only). Los `SKIP` por
+evidencia opcional ausente no se cuentan como `PASS`.
+
+Si un gate falla y su mensaje no te dice COMO arreglarlo, agrega `--agent`:
+
+```
+python scripts/preflight.py --agent
+```
+
+Cada gate en rojo arrastra entonces la receta de arreglo de los rule-ids
+que reporto. Para consultar una suelta: `python scripts/rule_hints.py
+<RULE_ID>`. No cambia el veredicto ni el exit code, solo la salida.
+
+Para auditar la FUERZA del seal recien sellado (no solo su integridad):
+`python scripts/audit_seals.py` (advisory; el sello certifica integridad,
+no fuerza — la calidad semantica del assert sigue siendo juicio humano).
+
+- Referencia normativa completa (niveles de gate, budget, perimetro,
+  ciclo de vida draft->verified): [validacion.md](./validacion.md).
+- Como delegar esta tarea a un agente en vez de implementarla vos mismo:
+  [metodologia-ejecucion.md](./metodologia-ejecucion.md).
+- Glosario completo de terminos CCDD/OKF: [OKF-SPEC.md](./OKF-SPEC.md).
