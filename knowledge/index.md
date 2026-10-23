@@ -104,3 +104,6 @@ Bienvenido a la base de conocimiento del proyecto. El formato de los nodos está
 
 - [Proyecto de prueba](demo-project.md)
 - [Saludo seguro por CLI](contracts/greeting.md)
+
+- [Calidad de producto en CI](product-quality-ci.md)
+- [Contrato de calidad obligatoria en CI](contracts/product-quality-ci.md)
