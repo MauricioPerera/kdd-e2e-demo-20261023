@@ -1,7 +1,6 @@
 {
   "protected": [
     "tests/test_greeting.py",
-    "tests/__init__.py",
     "src/__init__.py",
     "knowledge/contracts/greeting.md",
     "knowledge/demo-project.md",
