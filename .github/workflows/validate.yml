@@ -82,7 +82,7 @@ on:
         default: 'src'
       quality_policy_path:
         type: string
-        default: 'quality.json'
+        default: 'quality/product.json'
       quality_approved_ref:
         type: string
         default: ''
@@ -94,7 +94,7 @@ on:
         default: ''
       required_evidence:
         type: string
-        default: ''
+        default: 'quality'
 
 # Supersede native PR runs only. A caller owns its concurrency policy.
 # A distinct namespace prevents a reusable call from cancelling its caller.
@@ -128,8 +128,9 @@ jobs:
       KDD_OBSERVABILITY_SCAN_DIR: ${{ inputs.observability_scan_dir || 'observability/scan' }}
       KDD_TEST_COVERAGE_SCAN_DIR: ${{ inputs.test_coverage_scan_dir || 'test-coverage/scan' }}
       KDD_SRC_DIR_SECRETS: ${{ inputs.src_dir_secrets || 'src' }}
-      KDD_QUALITY_POLICY: ${{ inputs.quality_policy_path || 'quality.json' }}
-      KDD_REQUIRED_EVIDENCE: ${{ inputs.required_evidence || '' }}
+      KDD_QUALITY_POLICY: ${{ inputs.quality_policy_path || 'quality/product.json' }}
+      KDD_QUALITY_APPROVED_REF: ${{ inputs.quality_approved_ref || vars.KDD_QUALITY_APPROVED_REF || '' }}
+      KDD_REQUIRED_EVIDENCE: ${{ inputs.required_evidence || 'quality' }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -162,6 +163,22 @@ jobs:
               '--approved-ref', approved,
               '--contracts-dir', os.environ['KDD_CONTRACTS_DIR'],
           ]))
+
+      - name: Check product quality approval configuration
+        shell: python
+        run: |
+          import os
+          from pathlib import Path
+          import re
+          import subprocess
+          policy = os.environ['KDD_QUALITY_POLICY']
+          approved = os.environ['KDD_QUALITY_APPROVED_REF']
+          if not Path(policy).is_file():
+              raise SystemExit('FAIL: the product quality policy is required: ' + policy)
+          if not re.fullmatch(r'[0-9a-fA-F]{40}', approved):
+              raise SystemExit('FAIL: product quality requires an explicitly approved reference (full commit SHA)')
+          if subprocess.call(['git', 'merge-base', '--is-ancestor', approved, 'HEAD']):
+              raise SystemExit('FAIL: the approved product reference must exist and be an ancestor of this checkout')
 
       - name: Check required optional evidence
         run: python scripts/optional_evidence.py check --layers security,compliance,privacy,accessibility,dependency-eol,observability,test-coverage,quality
@@ -337,7 +354,7 @@ jobs:
         id: quality
         shell: python
         env:
-          KDD_QUALITY_POLICY: ${{ inputs.quality_policy_path || 'quality.json' }}
+          KDD_QUALITY_POLICY: ${{ inputs.quality_policy_path || 'quality/product.json' }}
           KDD_QUALITY_APPROVED_REF: ${{ inputs.quality_approved_ref || vars.KDD_QUALITY_APPROVED_REF || '' }}
         run: |
           import os
@@ -345,12 +362,22 @@ jobs:
           import re
           import subprocess
           import sys
+          import tempfile
           policy = os.environ['KDD_QUALITY_POLICY']
           approved = os.environ['KDD_QUALITY_APPROVED_REF']
           if Path(policy).exists() or approved:
               if not re.fullmatch(r'[0-9a-fA-F]{40}', approved):
                   raise SystemExit('FAIL: project policy requires an explicitly approved reference (full commit SHA)')
-              raise SystemExit(subprocess.call([sys.executable, 'scripts/verify_quality.py', '--policy', policy, '--approved-ref', approved]))
+              # The approved runner is stdlib-only; apply it to the current checkout.
+              with tempfile.TemporaryDirectory(prefix='kdd-approved-quality-') as directory:
+                  runner = Path(directory) / 'verify_quality.py'
+                  if runner.resolve().is_relative_to(Path.cwd().resolve()):
+                      raise SystemExit('FAIL: the trusted runner must be outside the checkout')
+                  runner.write_bytes(subprocess.check_output([
+                      'git', 'show', approved + ':scripts/verify_quality.py']))
+                  raise SystemExit(subprocess.call([
+                      sys.executable, str(runner), '--repo-root', '.',
+                      '--policy', policy, '--approved-ref', approved]))
           print('SKIP: no project quality policy configured; template validation does not approve a project')
 
       - name: Assemble context (smoke)

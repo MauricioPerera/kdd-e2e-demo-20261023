@@ -14,9 +14,10 @@ La primera tarea implementa [el saludo](contracts/greeting.md). El tablero
 registra el recorrido completo, incluido bloqueo y reanudacion. Las pruebas
 funcionales, adversariales y de CLI son el oraculo de producto.
 
-La politica quality/product.json aprueba el perimetro del implementador en
-la rama de tarea, antes de integrar y cerrar. Los metadatos y la evidencia
-posterior del coordinador se auditan con [el validador del diario](contracts/task-validation.md).
-El CI heredado comprueba los oraculos actuales y el diario en Ubuntu y
-Windows, con dos pasadas de la suite. Una validacion estructural verde no
+La politica quality/product.json se aplica al checkout completo mediante
+[la integracion obligatoria de CI](product-quality-ci.md), con referencia
+aprobada explicita. Los artefactos historicos de TASK-001 estan protegidos;
+[el validador del diario](contracts/task-validation.md) audita sus estados
+y evidencia por separado. Ubuntu y Windows ejecutan tambien dos pasadas de
+la suite. Una validacion verde comprueba las garantias declaradas y no
 equivale a una garantia universal de calidad ni a una aprobacion humana.

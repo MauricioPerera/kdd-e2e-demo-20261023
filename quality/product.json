@@ -64,13 +64,17 @@
     "scripts/verify_quality.py",
     ".github/workflows/deploy-pages.yml",
     ".github/workflows/trusted-pr-gate.yml",
-    ".github/workflows/validate.yml"
+    ".github/workflows/validate.yml",
+    "tests/test_product_quality_ci.py",
+    "knowledge/contracts/product-quality-ci.md",
+    "knowledge/product-quality-ci.md",
+    "knowledge/tasks/TASK-001.md",
+    "docs/task-evidence/TASK-001-abb784d29a0fabd2e2c956218f6f45bb098a6867.json"
   ],
   "implementation": [
     "src/greeting.py"
   ],
   "pm": [
-    "knowledge/tasks/TASK-001.md",
     "knowledge/index.md",
     "docs/reports/TASK-001-REPORT.md"
   ],
