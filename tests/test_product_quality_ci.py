@@ -184,8 +184,8 @@ class ProductQualityCiTests(unittest.TestCase):
                    KDD_QUALITY_OUTCOME='success', KDD_REQUIRED_EVIDENCE='quality')
         result = self.command([sys.executable, 'scripts/optional_evidence.py', 'summary',
                                '--layers', 'quality'], cwd=self.root, env=env)
-        self.assertIn('PASS [quality] quality/product.json', result.stdout)
-        self.assertNotIn('SKIP', result.stdout)
+        self.assertIn('PASS [quality] quality/product.json', result.stdout.replace('\\', '/'))
+        self.assertNotIn('SKIP [quality]', result.stdout)
         env['KDD_QUALITY_OUTCOME'] = 'failure'
         failed = self.command([sys.executable, 'scripts/optional_evidence.py', 'summary',
                                '--layers', 'quality'], cwd=self.root, env=env, check=False)

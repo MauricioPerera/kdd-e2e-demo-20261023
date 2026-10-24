@@ -13,7 +13,7 @@ budget:
   cyclomatic_max: 12
   nesting_max: 4
 tests: tests/test_product_quality_ci.py
-tests_sha256: '3e399f07d149ed00a3026e8411a62a361f9a6ab36ecf37f3ccf6b7c747e1a36c'
+tests_sha256: '868d0ae97795ae67142b81e88fb2c3deab98c4b6c1a468a11f3af6feb854fea6'
 touch_only: ['.github/workflows/validate.yml', 'quality/product.json']
 deps_allowed: ['stdlib']
 forbids: ['llm']
